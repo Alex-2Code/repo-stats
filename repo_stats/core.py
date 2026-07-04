@@ -292,3 +292,38 @@ def generate_compare_json(repo1_info: Dict[str, Any], repo2_info: Dict[str, Any]
             }
         }
     }
+
+
+def fetch_gitlab_stats(owner: str, repo: str, token: str) -> Dict[str, Any]:
+    """Fetch GitLab repository statistics."""
+    base_url = "https://gitlab.com/api/v4"
+    headers = {"PRIVATE-TOKEN": token}
+    
+    try:
+        # Repo info
+        resp = requests.get(f"{base_url}/projects/{owner}%2F{repo}", headers=headers)
+        if resp.status_code != 200:
+            return {"error": f"GitLab project not found: {resp.status_code}"}
+        
+        info = resp.json()
+        
+        # Recent commits
+        commits_resp = requests.get(
+            f"{base_url}/projects/{owner}%2F{repo}/repository/commits",
+            headers=headers, params={"per_page": 10}
+        )
+        commits = commits_resp.json() if commits_resp.status_code == 200 else []
+        
+        return {
+            "name": info.get("name"),
+            "stars": info.get("star_count", 0),
+            "forks": info.get("forks_count", 0),
+            "open_issues": info.get("open_issues_count", 0),
+            "last_push": info.get("last_pipeline_completed_at"),
+            "recent_commits": [
+                {"sha": c["short_id"], "message": c["title"], "author": c["author_name"], "date": c["committed_date"]}
+                for c in commits[:5]
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e)}
